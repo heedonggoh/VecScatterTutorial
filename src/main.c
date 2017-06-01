@@ -43,7 +43,7 @@ int main(int argc, char **args)
   ierr = VecScatterBegin(ctx,global,local,INSERT_VALUES,SCATTER_FORWARD); CHKERRQ(ierr);
   ierr = VecScatterEnd(ctx,global,local,INSERT_VALUES,SCATTER_FORWARD);   CHKERRQ(ierr);
 
-  /* check */
+  /* Check */
   ref = 0.0; for(i=0;i<N;++i) ref += i;
   sum = 0.0; for(i=0;i<cpuSize;++i) sum += i;
   ref *= sum;
