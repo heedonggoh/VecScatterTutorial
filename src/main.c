@@ -11,7 +11,8 @@ Performs 'local to global' and 'global to local' scatter operations. \n\
 int main(int argc, char **args)
 {
   PetscErrorCode ierr;
-  PetscInt N=5, cpuSize, cpuRank;
+  PetscInt N=5, cpuSize, cpuRank, i;
+  PetscScalar sum, ref;
   Vec local,global;
   VecScatter ctx,ctx2;
   IS is;
@@ -19,6 +20,7 @@ int main(int argc, char **args)
   ierr = PetscInitialize(&argc,&args,(char*)0,help); CHKERRQ(ierr);
   ierr = MPI_Comm_size(PETSC_COMM_WORLD,&cpuSize);   CHKERRQ(ierr);
   ierr = MPI_Comm_rank(PETSC_COMM_WORLD,&cpuRank);   CHKERRQ(ierr);
+  ierr = PetscOptionsGetInt(NULL,NULL,"-N",&N,NULL); CHKERRQ(ierr);
 
   /* Create and initialize global and local vectors */
   ierr = VecCreate(PETSC_COMM_WORLD,&global);    CHKERRQ(ierr);
@@ -26,6 +28,14 @@ int main(int argc, char **args)
   ierr = VecSetFromOptions(global);              CHKERRQ(ierr);
   ierr = VecCreateSeq(PETSC_COMM_SELF,N,&local); CHKERRQ(ierr);
   ierr = VecSet(local,cpuRank);                  CHKERRQ(ierr);
+  ref = 0.0; 
+  for(i=0;i<N;++i) {
+    ierr = VecSetValue(local,i,cpuRank*i,INSERT_VALUES); CHKERRQ(ierr);
+    ref += i;
+  }
+  sum = 0.0;
+  for(i=0;i<cpuSize;++i) sum += i;
+  ref *= sum;
 
   /* Add local vectors together into a global vector */
   ierr = ISCreateStride(PETSC_COMM_SELF,N,0,1,&is);                     CHKERRQ(ierr);
@@ -38,7 +48,9 @@ int main(int argc, char **args)
   ierr = VecScatterBegin(ctx,global,local,INSERT_VALUES,SCATTER_FORWARD); CHKERRQ(ierr);
   ierr = VecScatterEnd(ctx,global,local,INSERT_VALUES,SCATTER_FORWARD);   CHKERRQ(ierr);
 
-  ierr = VecView(local,PETSC_VIEWER_STDOUT_SELF); CHKERRQ(ierr);
+  /* check */
+  ierr = VecNorm(local,NORM_1,&sum); CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_SELF,"cpu %d; ref = %e; sum = %e; error %e\n",cpuRank,ref,sum,fabs(ref-sum)); CHKERRQ(ierr);
 
   ierr = VecScatterDestroy(&ctx);  CHKERRQ(ierr);
   ierr = VecScatterDestroy(&ctx2); CHKERRQ(ierr);
