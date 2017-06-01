@@ -28,14 +28,9 @@ int main(int argc, char **args)
   ierr = VecSetFromOptions(global);              CHKERRQ(ierr);
   ierr = VecCreateSeq(PETSC_COMM_SELF,N,&local); CHKERRQ(ierr);
   ierr = VecSet(local,cpuRank);                  CHKERRQ(ierr);
-  ref = 0.0; 
   for(i=0;i<N;++i) {
     ierr = VecSetValue(local,i,cpuRank*i,INSERT_VALUES); CHKERRQ(ierr);
-    ref += i;
   }
-  sum = 0.0;
-  for(i=0;i<cpuSize;++i) sum += i;
-  ref *= sum;
 
   /* Add local vectors together into a global vector */
   ierr = ISCreateStride(PETSC_COMM_SELF,N,0,1,&is);                     CHKERRQ(ierr);
@@ -49,8 +44,11 @@ int main(int argc, char **args)
   ierr = VecScatterEnd(ctx,global,local,INSERT_VALUES,SCATTER_FORWARD);   CHKERRQ(ierr);
 
   /* check */
+  ref = 0.0; for(i=0;i<N;++i) ref += i;
+  sum = 0.0; for(i=0;i<cpuSize;++i) sum += i;
+  ref *= sum;
   ierr = VecNorm(local,NORM_1,&sum); CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_SELF,"cpu %d; ref = %e; sum = %e; error %e\n",cpuRank,ref,sum,fabs(ref-sum)); CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_SELF,"cpu %d; ref = %e; L1 norm = %e; error %e\n",cpuRank,ref,sum,fabs(ref-sum)); CHKERRQ(ierr);
 
   ierr = VecScatterDestroy(&ctx);  CHKERRQ(ierr);
   ierr = VecScatterDestroy(&ctx2); CHKERRQ(ierr);
